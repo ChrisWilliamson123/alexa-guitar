@@ -1,12 +1,16 @@
 const Alexa = require("ask-sdk");
 
+const audioEvents = [
+  "AudioPlayer.PlaybackStopped",
+  "AudioPlayer.PlaybackStarted",
+  "AudioPlayer.PlaybackFinished",
+  "AudioPlayer.PlaybackNearlyFinished",
+  "AudioPlayer.PlaybackFailed"
+]
+
 const audioEventHandler = {
-  canHandle(handlerInput) {
-    return (handlerInput.requestEnvelope.request.type === "AudioPlayer.PlaybackStopped"
-      || handlerInput.requestEnvelope.request.type === "AudioPlayer.PlaybackStarted"
-      || handlerInput.requestEnvelope.request.type === "AudioPlayer.PlaybackFinished"
-      || handlerInput.requestEnvelope.request.type === "AudioPlayer.PlaybackNearlyFinished"
-      || handlerInput.requestEnvelope.request.type === "AudioPlayer.PlaybackFailed");
+  canHandle({ requestEnvelope: { request } }) {
+    return audioEvents.indexOf(request.type) > -1;
   },
   handle(handlerInput) {
     return handlerInput.responseBuilder.getResponse();
@@ -14,86 +18,60 @@ const audioEventHandler = {
 }
 
 const MetronomeIntentHandler = {
-  canHandle(handlerInput) {
-    return (
-      handlerInput.requestEnvelope.request.type === "IntentRequest" &&
-      handlerInput.requestEnvelope.request.intent.name === "MetronomeIntent"
-    );
+  canHandle({ requestEnvelope: { request } }) {
+    return request.type === "IntentRequest" && request.intent.name === "MetronomeIntent";
   },
   handle(handlerInput) {
     const bpm = handlerInput.requestEnvelope.request.intent.slots.bpm.value;
-    const speechText = `You asked to start a metronome at ${bpm} beats per minute`;
     return handlerInput.responseBuilder
-      .speak(speechText)
-      .withSimpleCard("Hello World", speechText)
-      .addAudioPlayerPlayDirective('REPLACE_ALL', 'https://s3.eu-west-2.amazonaws.com/beat-files/110-4_4.mp3', 'abc', 0, undefined)
+      .speak(`Starting metronome at ${bpm} BPM`)
+      .addAudioPlayerPlayDirective('REPLACE_ALL', `https://s3.eu-west-2.amazonaws.com/beat-files/${bpm}-4_4.mp3`, 'abc', 0, undefined)
       .getResponse();
   }
 };
 
 const LaunchRequestHandler = {
-  canHandle(handlerInput) {
-    return handlerInput.requestEnvelope.request.type === "LaunchRequest";
+  canHandle({ requestEnvelope: { request } }) {
+    return request.type === "LaunchRequest";
   },
   handle(handlerInput) {
-    const speechText = "Welcome to the Alexa Skills Kit, you can say hello!";
-
     return handlerInput.responseBuilder
-      .speak(speechText)
-      .reprompt(speechText)
-      .withSimpleCard("Hello World", speechText)
+      .speak("Welcome to Guitar for Alexa. You can ask for a metronome at a BPM between 30 and 250.")
+      .reprompt("You can ask for a metronome at a BPM between 30 and 250.")
       .getResponse();
   }
 };
 
 const HelpIntentHandler = {
-  canHandle(handlerInput) {
-    return (
-      handlerInput.requestEnvelope.request.type === "IntentRequest" &&
-      handlerInput.requestEnvelope.request.intent.name === "AMAZON.HelpIntent"
-    );
+  canHandle({ requestEnvelope: { request } }) {
+    return request.type === "IntentRequest" && request.intent.name === "AMAZON.HelpIntent";
   },
   handle(handlerInput) {
-    const speechText = "You can say hello to me!";
-
     return handlerInput.responseBuilder
-      .speak(speechText)
-      .reprompt(speechText)
-      .withSimpleCard("Hello World", speechText)
+      .speak("You can ask for a metronome at a BPM between 30 and 250. For example. Start a metronome at 80 beats per minute.")
       .getResponse();
   }
 };
 
 const CancelAndStopIntentHandler = {
-  canHandle(handlerInput) {
+  canHandle({ requestEnvelope: { request } }) {
     return (
-      handlerInput.requestEnvelope.request.type === "IntentRequest" &&
-      (handlerInput.requestEnvelope.request.intent.name ===
-        "AMAZON.CancelIntent" ||
-        handlerInput.requestEnvelope.request.intent.name ===
-          "AMAZON.StopIntent")
+      request.type === "IntentRequest" &&
+      (request.intent.name === "AMAZON.CancelIntent" || request.intent.name === "AMAZON.StopIntent")
     );
   },
   handle(handlerInput) {
     const speechText = "Goodbye!";
-
     return handlerInput.responseBuilder
       .speak(speechText)
-      .withSimpleCard("Hello World", speechText)
       .getResponse();
   }
 };
 
-function getOffsetInMilliseconds() {
-  // Extracting offsetInMilliseconds received in the request.
-  return this.event.request.offsetInMilliseconds;
-}
-
 const PauseIntentHandler = {
-  canHandle(handlerInput) {
+  canHandle({ requestEnvelope: { request } }) {
     return (
-      handlerInput.requestEnvelope.request.type === "IntentRequest"
-      && handlerInput.requestEnvelope.request.intent.name === 'AMAZON.PauseIntent'
+      request.type === "IntentRequest" && request.intent.name === 'AMAZON.PauseIntent'
     )
   },
   handle(handlerInput) {
@@ -104,10 +82,9 @@ const PauseIntentHandler = {
 }
 
 const ResumeIntentHandler = {
-  canHandle(handlerInput) {
+  canHandle({ requestEnvelope: { request } }) {
     return (
-      handlerInput.requestEnvelope.request.type === "IntentRequest"
-      && handlerInput.requestEnvelope.request.intent.name === 'AMAZON.ResumeIntent'
+      request.type === "IntentRequest" && request.intent.name === 'AMAZON.ResumeIntent'
     )
   },
   handle(handlerInput) {
@@ -117,20 +94,11 @@ const ResumeIntentHandler = {
       .getResponse()
   }
 }
-const SessionEndedRequestHandler = {
-  canHandle(handlerInput) {
-    return handlerInput.requestEnvelope.request.type === "SessionEndedRequest";
-  },
-  handle(handlerInput) {
-    //any cleanup logic goes here
-    return handlerInput.responseBuilder.getResponse();
-  }
-};
 
 let skill;
 
 async function mainHandler(event, context) {
-  console.log(`REQUEST++++${JSON.stringify(event, null, 2)}`);
+  console.log(`REQUEST:\n${JSON.stringify(event, null, 2)}`);
   
   if (!skill) {
     skill = Alexa.SkillBuilders.custom()
@@ -139,7 +107,6 @@ async function mainHandler(event, context) {
         MetronomeIntentHandler,
         HelpIntentHandler,
         CancelAndStopIntentHandler,
-        SessionEndedRequestHandler,
         audioEventHandler,
         PauseIntentHandler,
         ResumeIntentHandler
